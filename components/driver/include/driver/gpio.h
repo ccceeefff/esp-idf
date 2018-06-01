@@ -31,11 +31,11 @@ extern "C" {
 
 #define GPIO_SEL_0              (BIT(0))                         /*!< Pin 0 selected */
 #define GPIO_SEL_1              (BIT(1))                         /*!< Pin 1 selected */
-#define GPIO_SEL_2              (BIT(2))                         /*!< Pin 2 selected 
+#define GPIO_SEL_2              (BIT(2))                         /*!< Pin 2 selected
                                                                       @note There are more macros
                                                                       like that up to pin 39,
                                                                       excluding pins 20, 24 and 28..31.
-                                                                      They are not shown here 
+                                                                      They are not shown here
                                                                       to reduce redundant information. */
 /** @cond */
 #define GPIO_SEL_3              (BIT(3))                         /*!< Pin 3 selected */
@@ -170,7 +170,7 @@ typedef enum {
     GPIO_NUM_38 = 38,   /*!< GPIO38, input mode only */
     GPIO_NUM_39 = 39,   /*!< GPIO39, input mode only */
     GPIO_NUM_MAX = 40,
-/** @endcond */    
+/** @endcond */
 } gpio_num_t;
 
 typedef enum {
@@ -230,6 +230,7 @@ typedef enum {
 
 typedef void (*gpio_isr_t)(void*);
 typedef intr_handle_t gpio_isr_handle_t;
+typedef void (*gpio_isr_timing_provider_t)(uint64_t *);
 
 /**
  * @brief GPIO common configuration
@@ -445,6 +446,7 @@ esp_err_t gpio_pulldown_dis(gpio_num_t gpio_num);
   *     - ESP_ERR_NO_MEM No memory to install this service
   */
 esp_err_t gpio_install_isr_service(int intr_alloc_flags);
+esp_err_t gpio_install_isr_timing_service(int intr_alloc_flags, gpio_isr_timing_provider_t provider);
 
 /**
   * @brief Uninstall the driver's GPIO ISR service, freeing related resources.

@@ -372,6 +372,53 @@ void IRAM_ATTR gpio_intr_service(void* arg)
     } while (++gpio_num < GPIO_PIN_COUNT);
 }
 
+void IRAM_ATTR gpio_intr_timing_service(void* arg)
+{
+    uint64_t ts = 0;
+    if(arg != NULL){
+      gpio_isr_timing_provider_t provider = (gpio_isr_timing_provider_t)arg;
+      provider(&ts);
+    }
+
+    //GPIO intr process
+    uint32_t gpio_num = 0;
+    //read status to get interrupt status for GPIO0-31
+    uint32_t gpio_intr_status;
+    gpio_intr_status = GPIO.status;
+    //read status1 to get interrupt status for GPIO32-39
+    uint32_t gpio_intr_status_h;
+    gpio_intr_status_h = GPIO.status1.intr_st;
+
+    if (gpio_isr_func == NULL) {
+        return;
+    }
+    do {
+        if (gpio_num < 32) {
+            if (gpio_intr_status & BIT(gpio_num)) { //gpio0-gpio31
+                if (gpio_isr_func[gpio_num].fn != NULL) {
+                    if(gpio_isr_func[gpio_num].args){
+                        gpio_isr_func[gpio_num].fn(gpio_isr_func[gpio_num].args);
+                    } else {
+                        gpio_isr_func[gpio_num].fn(&ts);
+                    }
+                }
+                GPIO.status_w1tc = BIT(gpio_num);
+            }
+        } else {
+            if (gpio_intr_status_h & BIT(gpio_num - 32)) {
+                if (gpio_isr_func[gpio_num].fn != NULL) {
+                    if(gpio_isr_func[gpio_num].args){
+                        gpio_isr_func[gpio_num].fn(gpio_isr_func[gpio_num].args);
+                    } else {
+                        gpio_isr_func[gpio_num].fn(&ts);
+                    }
+                }
+                GPIO.status1_w1tc.intr_st = BIT(gpio_num - 32);
+            }
+        }
+    } while (++gpio_num < GPIO_PIN_COUNT);
+}
+
 esp_err_t gpio_isr_handler_add(gpio_num_t gpio_num, gpio_isr_t isr_handler, void* args)
 {
     GPIO_CHECK(gpio_isr_func != NULL, "GPIO isr service is not installed, call gpio_install_isr_service() first", ESP_ERR_INVALID_STATE);
@@ -411,6 +458,20 @@ esp_err_t gpio_install_isr_service(int intr_alloc_flags)
         ret = ESP_ERR_NO_MEM;
     } else {
         ret = gpio_isr_register(gpio_intr_service, NULL, intr_alloc_flags, &gpio_isr_handle);
+    }
+    portEXIT_CRITICAL(&gpio_spinlock);
+    return ret;
+}
+
+esp_err_t gpio_install_isr_timing_service(int intr_alloc_flags, gpio_isr_timing_provider_t provider){
+    GPIO_CHECK(gpio_isr_func == NULL, "GPIO isr service already installed", ESP_FAIL);
+    esp_err_t ret;
+    portENTER_CRITICAL(&gpio_spinlock);
+    gpio_isr_func = (gpio_isr_func_t*) calloc(GPIO_NUM_MAX, sizeof(gpio_isr_func_t));
+    if (gpio_isr_func == NULL) {
+        ret = ESP_ERR_NO_MEM;
+    } else {
+        ret = gpio_isr_register(gpio_intr_timing_service, provider, intr_alloc_flags, &gpio_isr_handle);
     }
     portEXIT_CRITICAL(&gpio_spinlock);
     return ret;
